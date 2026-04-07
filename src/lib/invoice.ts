@@ -12,41 +12,36 @@ export function generateInvoicePDF(bill: Bill, user: User): void {
   const pageWidth = 210;
   const margin = 10;
   const contentWidth = pageWidth - margin * 2;
+  const formatCurrency = (value: number) => `Rs. ${value.toFixed(2)}`;
 
-  /* ── GSTIN Header Bar ── */
-  doc.setFillColor(30, 58, 95); // primary navy
-  doc.rect(0, 0, pageWidth, 12, 'F');
-  doc.setTextColor(255, 255, 255);
+  /* ── Header ── */
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(20, 20, 20);
+  doc.text(user.shopName || 'Company Name', margin, 16);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${user.address || ''}`, margin, 22);
+  doc.text(`${user.city || ''}${user.city && user.district ? ', ' : ''}${user.district || ''}`, margin, 26);
+  doc.text(`${user.state || ''}${user.state && user.mobile ? ' | ' : ''}Mobile: ${user.mobile || ''}`, margin, 30);
+  doc.text(`GSTIN: ${user.gstNo || 'N/A'}`, margin, 34);
+
+  // "Invoice" label and reference
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('INVOICE', pageWidth - margin, 18, { align: 'right' });
+
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text(`GSTIN: ${user.gstNo || 'N/A'}`, margin, 8);
-
-  /* ── Company Header with red accent ── */
-  doc.setFillColor(220, 60, 40); // invoice accent red
-  doc.rect(0, 12, 60, 25, 'F');
-
-  // Orange gradient stripe
-  doc.setFillColor(230, 130, 50);
-  doc.rect(60, 12, pageWidth - 60, 3, 'F');
-
-  // Company Name
-  doc.setTextColor(30, 58, 95);
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.text(user.shopName || 'Company Name', 65, 25);
-
-  // Company Details
-  doc.setFontSize(8);
+  doc.text('Bill No.', pageWidth - margin, 28, { align: 'right' });
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(80, 80, 80);
-  doc.text(`${user.address || ''}, ${user.city || ''}, ${user.district || ''}`, 65, 31);
-  doc.text(`${user.state || ''} | Mobile: ${user.mobile || ''}`, 65, 35);
+  doc.text(`${bill.billNo}`, pageWidth - margin - 10, 28, { align: 'right' });
 
-  // "Invoice" label
-  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(220, 60, 40);
-  doc.text('Invoice', 65, 43);
+  doc.text('Date', pageWidth - margin, 34, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.text(new Date(bill.date).toLocaleDateString('en-IN'), pageWidth - margin - 10, 34, { align: 'right' });
 
   let yPos = 50;
 
@@ -100,8 +95,8 @@ export function generateInvoicePDF(bill: Bill, user: User): void {
     item.name,
     item.hsn || '-',
     `${item.quantity} ${item.unit}`,
-    `₹${item.rate.toFixed(2)}`,
-    `₹${item.amount.toFixed(2)}`,
+    formatCurrency(item.rate),
+    formatCurrency(item.amount),
   ]);
 
   autoTable(doc, {
@@ -109,6 +104,13 @@ export function generateInvoicePDF(bill: Bill, user: User): void {
     body: tableData,
     startY: yPos,
     margin: { left: margin, right: margin },
+    tableWidth: contentWidth,
+    styles: {
+      fontSize: 9,
+      textColor: [50, 50, 50],
+      overflow: 'linebreak',
+      cellPadding: 3,
+    },
     headStyles: {
       fillColor: [30, 58, 95],
       textColor: [255, 255, 255],
@@ -116,20 +118,16 @@ export function generateInvoicePDF(bill: Bill, user: User): void {
       fontStyle: 'bold',
       halign: 'center',
     },
-    bodyStyles: {
-      fontSize: 9,
-      textColor: [50, 50, 50],
-    },
     alternateRowStyles: {
       fillColor: [240, 248, 255],
     },
     columnStyles: {
-      0: { halign: 'center', cellWidth: 15 },
-      1: { cellWidth: 60 },
-      2: { halign: 'center', cellWidth: 20 },
+      0: { halign: 'center', cellWidth: 12 },
+      1: { cellWidth: 70, halign: 'left' },
+      2: { halign: 'center', cellWidth: 22 },
       3: { halign: 'center', cellWidth: 25 },
-      4: { halign: 'right', cellWidth: 25 },
-      5: { halign: 'right', cellWidth: 30 },
+      4: { halign: 'right', cellWidth: 30 },
+      5: { halign: 'right', cellWidth: 36 },
     },
     theme: 'grid',
   });
@@ -146,30 +144,31 @@ export function generateInvoicePDF(bill: Bill, user: User): void {
   doc.setTextColor(30, 58, 95);
   doc.text('Sub Total', totalsX, totY);
   doc.setFont('helvetica', 'normal');
-  doc.text(`₹${bill.subTotal.toFixed(2)}`, pageWidth - margin - 5, totY, { align: 'right' });
+  doc.text(formatCurrency(bill.subTotal), pageWidth - margin - 5, totY, { align: 'right' });
 
   totY += 7;
   // CGST
   doc.setFont('helvetica', 'bold');
   doc.text(`CGST ${bill.cgstPercent}%`, totalsX, totY);
   doc.setFont('helvetica', 'normal');
-  doc.text(`₹${bill.cgstAmount.toFixed(2)}`, pageWidth - margin - 5, totY, { align: 'right' });
+  doc.text(formatCurrency(bill.cgstAmount), pageWidth - margin - 5, totY, { align: 'right' });
 
   totY += 7;
   // SGST
   doc.setFont('helvetica', 'bold');
   doc.text(`SGST ${bill.sgstPercent}%`, totalsX, totY);
   doc.setFont('helvetica', 'normal');
-  doc.text(`₹${bill.sgstAmount.toFixed(2)}`, pageWidth - margin - 5, totY, { align: 'right' });
+  doc.text(formatCurrency(bill.sgstAmount), pageWidth - margin - 5, totY, { align: 'right' });
 
   totY += 8;
-  // Grand Total with accent background
-  doc.setFillColor(220, 60, 40);
-  doc.rect(totalsX - 5, totY - 5, 80, 8, 'F');
-  doc.setTextColor(255, 255, 255);
+  // Grand Total
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.1);
+  doc.line(totalsX - 5, totY - 3, pageWidth - margin, totY - 3);
+  doc.setTextColor(30, 58, 95);
   doc.setFont('helvetica', 'bold');
-  doc.text('Grand Total ₹', totalsX, totY);
-  doc.text(`₹${bill.grandTotal.toFixed(2)}`, pageWidth - margin - 5, totY, { align: 'right' });
+  doc.text('Grand Total', totalsX, totY);
+  doc.text(formatCurrency(bill.grandTotal), pageWidth - margin - 5, totY, { align: 'right' });
 
   totY += 12;
 
